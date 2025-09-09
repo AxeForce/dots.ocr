@@ -7,6 +7,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 RUN pip3 install --no-cache-dir flash_attn==2.8.0.post2
 RUN pip3 install --no-cache-dir transformers==4.51.3
 
-COPY entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
-
 
