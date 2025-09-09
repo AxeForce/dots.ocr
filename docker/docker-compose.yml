@@ -1,43 +1,45 @@
-version: '3.8'
+# docker/docker-compose.yml
+version: "3.9"
 
 services:
-  dots-ocr-server:
-    image: dots-ocr:latest
-    container_name: dots-ocr-container
+  dotsocr-vllm:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: dotsocr-vllm:0.9.1
+    container_name: dotsocr-vllm
     ports:
       - "8000:8000"
-    volumes:
-      #download model to local，model url：https://www.modelscope.cn/models/rednote-hilab/dots.ocr
-      - ./model/dots.ocr:/workspace/weights/DotsOCR
     environment:
-      - PYTHONPATH=/workspace/weights:$PYTHONPATH
+      # Optional, only if the HF repo ever becomes gated:
+      # HF_TOKEN: ${HF_TOKEN}
+      MODEL_ID: rednote-hilab/dots.ocr
+      DOWNLOAD_DIR: /models
+      MODEL_DIR: /models/DotsOCR
+      VLLM_LOGGING_LEVEL: INFO
+      # For NVIDIA Container Toolkit:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - models:/models   # persist weights & cache across restarts
+      - hf_cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
-              device_ids: ['0']
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        set -ex;
-        echo '--- Starting setup and server ---';
-        echo 'Modifying vllm entrypoint...';
-        # This sed command patches the vllm entrypoint script to import the custom modeling code.
-        sed -i '/^from vllm\.entrypoints\.cli\.main import main/a from DotsOCR import modeling_dots_ocr_vllm' $(which vllm) && \
-        echo 'vllm script after patch:';
-        # Show the patched part of the vllm script for verification.
-        grep -A 1 'from vllm.entrypoints.cli.main import main' $(which vllm) && \
-        echo 'Starting server...';
-        # Use 'exec' to replace the current shell process with the vllm server,
-        # ensuring logs are properly forwarded to Docker's standard output.
-        exec vllm serve /workspace/weights/DotsOCR \
-            --tensor-parallel-size 1 \
-            --gpu-memory-utilization 0.8 \
-            --chat-template-content-format string \
-            --served-model-name dotsocr-model \
-            --trust-remote-code
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v1/models"]
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+volumes:
+  models:
+  hf_cache:
 
 
 
