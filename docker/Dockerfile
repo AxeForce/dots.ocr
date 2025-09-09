@@ -29,16 +29,52 @@ RUN python -m build --wheel -o /wheels
 
 
 # -------- Stage 2: build FlashAttention wheel (needs nvcc)
-FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS flashattn-builder
+# --- Builder: compile flash-attn against CUDA 12.1 + Torch 2.7.0
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04 AS flashattn-builder
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CUDA_HOME=/usr/local/cuda \
+    MAX_JOBS=8
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 python3-pip python3-dev build-essential git cmake ninja-build \
-    && rm -rf /var/lib/apt/lists/*
-RUN python3 -m pip install --upgrade pip
-# Match Torch/CUDA to runtime
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
-      torch==2.7.0
-ENV MAX_JOBS=8
-RUN pip wheel --no-deps --no-cache-dir "flash-attn==2.8.0.post2" -w /flashwheels
+    python3 python3-pip python3-dev build-essential ninja-build git cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+# make sure build tooling exists (this fixes your 'packaging' error)
+RUN python3 -m pip install --upgrade pip \
+ && pip3 install --upgrade setuptools wheel packaging ninja
+
+# Install the exact Torch you target (CUDA 12.1 wheels)
+ARG TORCH_VERSION=2.7.0
+RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cu121 \
+    torch==${TORCH_VERSION}
+
+
+# Build wheel
+RUN pip3 wheel --no-deps --no-build-isolation "flash-attn==2.8.0.post2" -w /flashwheels
+
+# --- Runtime: install torch + the prebuilt wheel
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CUDA_HOME=/usr/local/cuda
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+ && rm -rf /var/lib/apt/lists/*
+
+# Torch must match the builder’s version/CUDA
+ARG TORCH_VERSION=2.7.0
+RUN python3 -m pip install --upgrade pip \
+ && pip3 install --extra-index-url https://download.pytorch.org/whl/cu121 \
+    torch==${TORCH_VERSION}
+
+COPY --from=flashattn-builder /flashwheels /flashwheels
+RUN pip3 install /flashwheels/flash_attn-2.8.0.post2-*.whl
 
 
 # -------- Stage 3: runtime (Torch + vLLM + DotsOCR + weights)
