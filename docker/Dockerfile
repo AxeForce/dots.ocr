@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git git-lfs && 
 RUN pip install --no-cache-dir "huggingface_hub>=0.24.6"
 
 # 1) Get the DotsOCR repo (for version pinning/reference)
-ARG DOTSOCR_REF=main
-RUN git clone --depth 1 --branch ${DOTSOCR_REF} https://github.com/rednote-hilab/dots.ocr.git /src/dots.ocr
+ARG DOTSOCR_REF=master
+RUN git clone --depth 1 --branch "${DOTSOCR_REF}" https://github.com/rednote-hilab/dots.ocr.git /src/dots.ocr
 
 # 2) Download the model weights into a dot-free folder (/models/DotsOCR)
 #    We use HF Hub directly to avoid extra build deps in this stage.
@@ -48,7 +48,7 @@ RUN python3 -m pip install --upgrade pip && \
 # vLLM and runtime libs (pin vLLM 0.9.1 to match their evals)
 RUN pip install --no-cache-dir \
       "vllm==0.9.1" \
-      "transformers>=4.44.0" \
+      "transformers>=4.51.3" \
       "accelerate>=0.34.0" \
       "sentencepiece" \
       "protobuf<5"
