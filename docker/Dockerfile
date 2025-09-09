@@ -1,31 +1,25 @@
-# -------- Stage 1: fetch source + weights (CPU OK)
+# -------- Stage 1: fetch source + weights + build dots-ocr wheel (CPU OK)
 FROM python:3.10-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends git git-lfs && \
-    git lfs install && \
-    rm -rf /var/lib/apt/lists/*
+    git lfs install && rm -rf /var/lib/apt/lists/*
 
-# Install only what we need to download weights via HF Hub
-RUN pip install --no-cache-dir "huggingface_hub>=0.24.6" build setuptools wheel setuptools-scm hatchling
+RUN pip install --no-cache-dir huggingface_hub>=0.24.6 build setuptools wheel setuptools-scm hatchling
 
-# 1) Get the DotsOCR repo (for version pinning/reference)
 ARG DOTSOCR_REF=master
 RUN git clone --depth 1 --branch "${DOTSOCR_REF}" https://github.com/rednote-hilab/dots.ocr.git /src/dots.ocr
 
-# 2) Download the model weights into a dot-free folder (/models/DotsOCR)
-#    We use HF Hub directly to avoid extra build deps in this stage.
+# Download model weights to a dot-free folder
 RUN python - <<'PY'
 import os, shutil
 from huggingface_hub import snapshot_download
 repo_path = snapshot_download(
     "rednote-hilab/dots.ocr",
     resume_download=True,
-    # keep it lean but safe; adjust if you need more files
     allow_patterns=["*.safetensors","*.bin","*.json","*.py","tokenizer*","*.model","*.txt","merges.txt","vocab.json"]
 )
-dest = "/models/DotsOCR"   # **NO DOTS** in dirname (per Quick Start)
-if os.path.isdir(dest):
-    shutil.rmtree(dest)
+dest = "/models/DotsOCR"
+if os.path.isdir(dest): shutil.rmtree(dest)
 shutil.copytree(repo_path, dest)
 print("Weights copied to", dest)
 PY
@@ -33,45 +27,66 @@ PY
 WORKDIR /src/dots.ocr
 RUN python -m build --wheel -o /wheels
 
-# -------- Stage 2: CUDA runtime + Torch + vLLM + DotsOCR
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04 AS flashattn-builder
-RUN apt-get update && apt-get install -y --no-install-recommends python3-pip build-essential && rm -rf /var/lib/apt/lists/*
-RUN python3 -m pip install --upgrade pip && \
-    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
+
+# -------- Stage 2: build FlashAttention wheel (needs nvcc)
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS flashattn-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-dev build-essential git cmake ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip
+# Match Torch/CUDA to runtime
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
+      torch==2.7.0
+ENV MAX_JOBS=8
+RUN pip wheel --no-deps --no-cache-dir "flash-attn==2.8.0.post2" -w /flashwheels
+
+
+# -------- Stage 3: runtime (Torch + vLLM + DotsOCR + weights)
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
+
+# Basics
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip ca-certificates git && \
+    rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip
+
+# Torch cu128
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
       torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
-RUN pip wheel --no-deps "flash-attn==2.8.0.post2" -w /flashwheels
 
-# vLLM and runtime libs (pin transformers exactly)
+# vLLM + runtime deps (pin transformers to 4.51.3)
 RUN pip install --no-cache-dir \
-      "vllm==0.9.1" \
-      "transformers==4.51.3" \
+      vllm==0.9.1 \
+      transformers==4.51.3 \
       "accelerate>=0.34.0" \
-      "sentencepiece" 
+      sentencepiece \
+      "protobuf<5"
 
-# --- in your runtime stage (after installing torch/vLLM)
+# Install prebuilt FlashAttention (no compile in runtime)
 COPY --from=flashattn-builder /flashwheels/*.whl /tmp/flashattn/
-RUN pip install --no-cache-dir /tmp/flashattn/*.whl
+RUN pip install --no-cache-dir /tmp/flashattn/*.whl && rm -rf /tmp/flashattn
+
+# Install dots-ocr wheel you built in Stage 1
+COPY --from=builder /wheels/*.whl /tmp/dots-ocr/
+RUN pip install --no-cache-dir /tmp/dots-ocr/*.whl && rm -rf /tmp/dots-ocr
 
 # Bring in the baked model weights (dot-free folder)
 COPY --from=builder /models/DotsOCR /models/DotsOCR
 
-# Required by Quick Start: set PYTHONPATH to the parent of hf_model_path
+# Quick Start env
 ENV HF_MODEL_PATH=/models/DotsOCR
 ENV PYTHONPATH=/models:${PYTHONPATH}
+# Helps with CUDA memory fragmentation
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# Patch vLLM entrypoint to register the model (Quick Start’s sed trick)
-# This inserts: "from DotsOCR import modeling_dots_ocr_vllm" after the main import.
+# Patch vLLM entrypoint to register the model
 RUN VLLM_BIN="$(which vllm)" && \
     sed -i '/^from vllm\.entrypoints\.cli\.main import main$/a from DotsOCR import modeling_dots_ocr_vllm' "$VLLM_BIN" && \
-    echo "Patched: $VLLM_BIN" && \
     grep -n "modeling_dots_ocr_vllm" "$VLLM_BIN"
 
-# vLLM server
 EXPOSE 8000
 ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
 
-# Launch exactly like the Quick Start suggests
-# (served name can be anything; keeping HF id for clients)
 CMD ["bash","-lc", "\
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0} \
 vllm serve ${HF_MODEL_PATH} \
