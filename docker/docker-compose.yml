@@ -1,28 +1,25 @@
-# docker/docker-compose.yml
 version: "3.9"
 
 services:
   dotsocr-vllm:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile
     image: dotsocr-vllm:0.9.1
     container_name: dotsocr-vllm
-    ports:
-      - "8000:8000"
     environment:
-      # Optional, only if the HF repo ever becomes gated:
+      # Only set if the HF repo is private/gated:
       # HF_TOKEN: ${HF_TOKEN}
       MODEL_ID: rednote-hilab/dots.ocr
       DOWNLOAD_DIR: /models
-      MODEL_DIR: /models/DotsOCR
       VLLM_LOGGING_LEVEL: INFO
-      # For NVIDIA Container Toolkit:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
-      - models:/models   # persist weights & cache across restarts
+      - models:/models
       - hf_cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
     deploy:
       resources:
         reservations:
@@ -40,7 +37,3 @@ services:
 volumes:
   models:
   hf_cache:
-
-
-
-
