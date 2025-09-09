@@ -30,7 +30,7 @@ RUN python -m build --wheel -o /wheels
 
 # -------- Stage 2: build FlashAttention wheel (needs nvcc)
 # --- Builder: compile flash-attn against CUDA 12.1 + Torch 2.7.0
-FROM nvidia/cuda:12.1.1-devel-ubuntu22.04 AS flashattn-builder
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS flashattn-builder
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -48,7 +48,7 @@ RUN python3 -m pip install --upgrade pip \
 
 # Install the exact Torch you target (CUDA 12.1 wheels)
 ARG TORCH_VERSION=2.7.0
-RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cu121 \
+RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==${TORCH_VERSION}
 
 
@@ -56,7 +56,7 @@ RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cu121 \
 RUN pip3 wheel --no-deps --no-build-isolation "flash-attn==2.8.0.post2" -w /flashwheels
 
 # --- Runtime: install torch + the prebuilt wheel
-FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Torch must match the builder’s version/CUDA
 ARG TORCH_VERSION=2.7.0
 RUN python3 -m pip install --upgrade pip \
- && pip3 install --extra-index-url https://download.pytorch.org/whl/cu121 \
+ && pip3 install --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==${TORCH_VERSION}
 
 COPY --from=flashattn-builder /flashwheels /flashwheels
