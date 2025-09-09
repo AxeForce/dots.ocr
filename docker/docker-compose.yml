@@ -1,20 +1,24 @@
 version: "3.9"
 
 services:
-  dotsocr-vllm:
+  dotsocr:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: dotsocr-vllm:0.9.1
-    container_name: dotsocr-vllm
+    image: dotsocr-vllm:0.9.1-runtime
+    container_name: dotsocr
+    command: >
+      --model /models/DotsOCR
+      --trust-remote-code
+      --download-dir /models
+      --host 0.0.0.0
+      --port 8000
     environment:
-      # Only set if the HF repo is private/gated:
-      # HF_TOKEN: ${HF_TOKEN}
-      MODEL_ID: rednote-hilab/dots.ocr
-      DOWNLOAD_DIR: /models
-      VLLM_LOGGING_LEVEL: INFO
+      HF_HOME: /root/.cache/huggingface
+      HF_MODEL_PATH: /models/DotsOCR
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      # HF_TOKEN: ${HF_TOKEN}   # only if needed
     volumes:
       - models:/models
       - hf_cache:/root/.cache/huggingface
@@ -27,12 +31,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v1/models"]
-      interval: 20s
-      timeout: 5s
-      retries: 15
-      start_period: 60s
 
 volumes:
   models:
