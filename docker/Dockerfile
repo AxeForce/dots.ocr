@@ -47,18 +47,22 @@ RUN python3 -m pip install --upgrade pip && \
       --index-url https://download.pytorch.org/whl/cu128 \
       torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 
-# vLLM and runtime libs (pin vLLM 0.9.1 to match their evals)
+# vLLM and runtime libs (pin transformers exactly)
 RUN pip install --no-cache-dir \
       "vllm==0.9.1" \
-      "transformers>=4.51.3" \
+      "transformers==4.51.3" \
       "accelerate>=0.34.0" \
       "sentencepiece" \
-      "protobuf<5"
+      "protobuf<5" \
+      "gradio>=5" \
+      "gradio_image_annotation==0.4.0" \
+      "PyMuPDF>=1.24" \
+      "qwen_vl_utils>=0.0.11" \
+      "modelscope>=1.29"
 
-# Bring in the DotsOCR source (we'll install it editable-style)
-# Install the prebuilt wheel instead of editable install
+# Install the prebuilt wheel but DO NOT resolve its deps (avoids flash-attn)
 COPY --from=builder /wheels/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl
+RUN pip install --no-cache-dir --no-deps /tmp/*.whl
 
 # Bring in the baked model weights (dot-free folder)
 COPY --from=builder /models/DotsOCR /models/DotsOCR
