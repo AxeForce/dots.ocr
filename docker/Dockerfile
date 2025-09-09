@@ -32,7 +32,7 @@ PY
 
 
 # -------- Stage 2: CUDA runtime + Torch + vLLM + DotsOCR
-FROM nvidia/cuda:12.8.0-cudnn9-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 
 # Basic runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
