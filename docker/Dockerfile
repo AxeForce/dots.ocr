@@ -34,35 +34,23 @@ WORKDIR /src/dots.ocr
 RUN python -m build --wheel -o /wheels
 
 # -------- Stage 2: CUDA runtime + Torch + vLLM + DotsOCR
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
-
-# Basic runtime deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 python3-pip ca-certificates git && \
-    rm -rf /var/lib/apt/lists/*
-
-# Torch 2.7.0 with CUDA 12.8 wheels (as per Quick Start)
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04 AS flashattn-builder
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip build-essential && rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip && \
-    pip install --no-cache-dir \
-      --index-url https://download.pytorch.org/whl/cu128 \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
       torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
+RUN pip wheel --no-deps "flash-attn==2.8.0.post2" -w /flashwheels
 
 # vLLM and runtime libs (pin transformers exactly)
 RUN pip install --no-cache-dir \
       "vllm==0.9.1" \
       "transformers==4.51.3" \
       "accelerate>=0.34.0" \
-      "sentencepiece" \
-      "protobuf<5" \
-      "gradio>=5" \
-      "gradio_image_annotation==0.4.0" \
-      "PyMuPDF>=1.24" \
-      "qwen_vl_utils>=0.0.11" \
-      "modelscope>=1.29"
+      "sentencepiece" 
 
-# Install the prebuilt wheel but DO NOT resolve its deps (avoids flash-attn)
-COPY --from=builder /wheels/*.whl /tmp/
-RUN pip install --no-cache-dir --no-deps /tmp/*.whl
+# --- in your runtime stage (after installing torch/vLLM)
+COPY --from=flashattn-builder /flashwheels/*.whl /tmp/flashattn/
+RUN pip install --no-cache-dir /tmp/flashattn/*.whl
 
 # Bring in the baked model weights (dot-free folder)
 COPY --from=builder /models/DotsOCR /models/DotsOCR
