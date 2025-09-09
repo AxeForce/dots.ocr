@@ -1,12 +1,12 @@
 # -------- Stage 1: fetch source + weights (CPU OK)
-FROM python:3.12-slim AS builder
+FROM python:3.10-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends git git-lfs && \
     git lfs install && \
     rm -rf /var/lib/apt/lists/*
 
 # Install only what we need to download weights via HF Hub
-RUN pip install --no-cache-dir "huggingface_hub>=0.24.6"
+RUN pip install --no-cache-dir "huggingface_hub>=0.24.6" build setuptools wheel setuptools-scm hatchling
 
 # 1) Get the DotsOCR repo (for version pinning/reference)
 ARG DOTSOCR_REF=master
@@ -30,6 +30,8 @@ shutil.copytree(repo_path, dest)
 print("Weights copied to", dest)
 PY
 
+WORKDIR /src/dots.ocr
+RUN python -m build --wheel -o /wheels
 
 # -------- Stage 2: CUDA runtime + Torch + vLLM + DotsOCR
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
@@ -54,12 +56,9 @@ RUN pip install --no-cache-dir \
       "protobuf<5"
 
 # Bring in the DotsOCR source (we'll install it editable-style)
-COPY --from=builder /src/dots.ocr /opt/DotsOCR-src
-
-# Install the package so "from DotsOCR import ..." works
-# The repo's package is named "DotsOCR" (capital D) in their examples.
-WORKDIR /opt/DotsOCR-src
-RUN pip install --no-cache-dir -e .
+# Install the prebuilt wheel instead of editable install
+COPY --from=builder /wheels/*.whl /tmp/
+RUN pip install --no-cache-dir /tmp/*.whl
 
 # Bring in the baked model weights (dot-free folder)
 COPY --from=builder /models/DotsOCR /models/DotsOCR
