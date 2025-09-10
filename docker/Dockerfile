@@ -131,4 +131,5 @@ vllm serve ${HF_MODEL_PATH} \
   --chat-template-content-format string \
   --served-model-name rednote-hilab/dots.ocr \
   --trust-remote-code \
+  --enforce-eager \
 "]
