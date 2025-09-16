@@ -33,10 +33,10 @@ repo = snapshot_download(
     os.environ.get("QWEN3_REPO"),
     resume_download=True
 )
-dest = "/models/Qwen3-4B"
+dest = "/models/Qwen3-4B-FP8"
 if os.path.isdir(dest): shutil.rmtree(dest)
 shutil.copytree(repo, dest)
-print("Qwen3-4B weights ->", dest)
+print("Qwen3-4B-FP8 weights ->", dest)
 PY
 
 WORKDIR /src/dots.ocr
@@ -84,11 +84,11 @@ RUN pip install --no-cache-dir /tmp/dots-ocr/*.whl && rm -rf /tmp/dots-ocr
 
 # Bring models
 COPY --from=builder /models/DotsOCR /models/DotsOCR
-COPY --from=builder /models/Qwen3-8B-Instruct /models/Qwen3-8B-Instruct   # >>> QWEN3
+COPY --from=builder /models/Qwen3-4B-FP8 /models/Qwen3-4B-FP8   # >>> QWEN3
 
 # Quick Start env
 ENV HF_DOTS_PATH=/models/DotsOCR
-ENV HF_QWEN3_PATH=/models/Qwen3-8B-Instruct
+ENV HF_QWEN3_PATH=/models/Qwen3-4B-FP8
 ENV PYTHONPATH=/models:${PYTHONPATH}
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
@@ -112,9 +112,9 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
   '  --served-model-name rednote-hilab/dots.ocr \' \
   '  --trust-remote-code --enforce-eager --port "$PORT_OCR" &' \
   '' \
-  'echo "Starting Qwen3-8B-Instruct on :$PORT_QWEN (GPU $GPU)..."' \
+  'echo "Starting Qwen3-4B-FP8-Instruct on :$PORT_QWEN (GPU $GPU)..."' \
   'vllm serve "$HF_QWEN3_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.95 \' \
-  '  --served-model-name Qwen/Qwen3-8B \' \
+  '  --served-model-name Qwen/Qwen3-4B-FP8 \' \
   '  --trust-remote-code --port "$PORT_QWEN" &' \
   '' \
   'wait -n' > /usr/local/bin/start-both.sh \
