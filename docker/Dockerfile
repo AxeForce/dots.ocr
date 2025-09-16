@@ -84,7 +84,7 @@ RUN pip install --no-cache-dir /tmp/dots-ocr/*.whl && rm -rf /tmp/dots-ocr
 
 # Bring models
 COPY --from=builder /models/DotsOCR /models/DotsOCR
-COPY --from=builder /models/Qwen3-4B-FP8 /models/Qwen3-4B-FP8   # >>> QWEN3
+COPY --from=builder /models/Qwen3-4B-FP8 /models/Qwen3-4B-FP8   # QWEN3
 
 # Quick Start env
 ENV HF_DOTS_PATH=/models/DotsOCR
