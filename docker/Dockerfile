@@ -33,10 +33,10 @@ repo = snapshot_download(
     os.environ.get("QWEN3_REPO"),
     resume_download=True
 )
-dest = "/models/Qwen3-8B-Instruct"
+dest = "/models/Qwen3-8B"
 if os.path.isdir(dest): shutil.rmtree(dest)
 shutil.copytree(repo, dest)
-print("Qwen3-8B-Instruct weights ->", dest)
+print("Qwen3-8B weights ->", dest)
 PY
 
 WORKDIR /src/dots.ocr
