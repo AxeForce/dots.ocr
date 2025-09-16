@@ -25,7 +25,7 @@ print("DotsOCR weights ->", dest)
 PY
 
 # >>> QWEN3: download Qwen3-8B-Instruct weights too
-ARG QWEN3_REPO="lm-kit/qwen-3-8b-instruct-gguf"
+ARG QWEN3_REPO="Qwen/Qwen3-8B"
 RUN python - <<'PY'
 import os, shutil
 from huggingface_hub import snapshot_download
@@ -114,7 +114,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
   '' \
   'echo "Starting Qwen3-8B-Instruct on :$PORT_QWEN (GPU $GPU)..."' \
   'vllm serve "$HF_QWEN3_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.95 \' \
-  '  --served-model-name Qwen/Qwen3-8B-Instruct \' \
+  '  --served-model-name Qwen/Qwen3-8B \' \
   '  --trust-remote-code --port "$PORT_QWEN" &' \
   '' \
   'wait -n' > /usr/local/bin/start-both.sh \
