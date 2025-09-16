@@ -25,7 +25,7 @@ print("DotsOCR weights ->", dest)
 PY
 
 # >>> QWEN3: download Qwen3-8B-Instruct weights too
-ARG QWEN3_REPO="Qwen/Qwen3-8B-FP8"
+ARG QWEN3_REPO="Qwen/Qwen3-4B-FP8"
 RUN python - <<'PY'
 import os, shutil
 from huggingface_hub import snapshot_download
@@ -33,10 +33,10 @@ repo = snapshot_download(
     os.environ.get("QWEN3_REPO"),
     resume_download=True
 )
-dest = "/models/Qwen3-8B"
+dest = "/models/Qwen3-4B"
 if os.path.isdir(dest): shutil.rmtree(dest)
 shutil.copytree(repo, dest)
-print("Qwen3-8B weights ->", dest)
+print("Qwen3-4B weights ->", dest)
 PY
 
 WORKDIR /src/dots.ocr
