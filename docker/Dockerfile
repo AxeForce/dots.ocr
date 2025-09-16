@@ -25,7 +25,7 @@ print("DotsOCR weights ->", dest)
 PY
 
 # >>> QWEN3: download Qwen3-8B-Instruct weights too
-ARG QWEN3_REPO="Qwen/Qwen3-8B"
+ARG QWEN3_REPO="Qwen/Qwen3-8B-FP8"
 RUN python - <<'PY'
 import os, shutil
 from huggingface_hub import snapshot_download
