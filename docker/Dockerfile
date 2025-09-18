@@ -60,6 +60,12 @@ FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates git tini \
  && rm -rf /var/lib/apt/lists/*
+
+# Add compiler toolchain for Triton JIT kernels (needed by FP8 quantization)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+&& rm -rf /var/lib/apt/lists/*
+
 RUN python3 -m pip install --upgrade pip
 
 # Torch cu128
