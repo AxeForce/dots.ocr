@@ -112,9 +112,11 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
   '  --served-model-name rednote-hilab/dots.ocr \' \
   '  --trust-remote-code --enforce-eager --port "$PORT_OCR" &' \
   '' \
-  'echo "Starting Qwen3-4B-FP8-Instruct on :$PORT_QWEN (GPU $GPU)..."' \
-  'vllm serve "$HF_QWEN3_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.95 \' \
+  'echo "Starting Qwen3-4B-FP8 on :$PORT_QWEN (GPU $GPU)..."' \
+  'vllm serve "$HF_QWEN3_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.25 \' \
   '  --served-model-name Qwen/Qwen3-4B-FP8 \' \
+  '  --quantization fp8 --kv-cache-dtype fp8 \' \
+  '  --max-model-len 4096 --max-num-seqs 4 --max-num-batched-tokens 2048 \' \
   '  --trust-remote-code --port "$PORT_QWEN" &' \
   '' \
   'wait -n' > /usr/local/bin/start-both.sh \
