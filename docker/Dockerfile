@@ -66,6 +66,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
 && rm -rf /var/lib/apt/lists/*
 
+# Ensure FP8 Triton JIT can link against CUDA
+# (many runtimes only have libcuda.so.1 mounted by the host driver)
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libcuda.so.1 /usr/lib/x86_64-linux-gnu/libcuda.so || true
+
+# Optional: make CUDA path explicit for Triton
+ENV TRITON_CUDA_HOME=/usr/local/cuda
+
 RUN python3 -m pip install --upgrade pip
 
 # Torch cu128
