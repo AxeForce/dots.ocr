@@ -58,13 +58,12 @@ RUN pip3 wheel --no-deps --no-build-isolation "flash-attn==2.8.0.post2" -w /flas
 # -------- Stage 3: runtime (Torch + vLLM + DotsOCR + weights)
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates git tini \
- && rm -rf /var/lib/apt/lists/*
-
-# Add compiler toolchain for Triton JIT kernels (needed by FP8 quantization)
+# Add Python dev headers + toolchain, keep tini
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-&& rm -rf /var/lib/apt/lists/*
+      python3 python3-pip python3-dev gcc g++ make ca-certificates git tini \
+ && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip
+
 
 # Ensure FP8 Triton JIT can link against CUDA
 # (many runtimes only have libcuda.so.1 mounted by the host driver)
@@ -73,7 +72,6 @@ RUN ln -sf /usr/lib/x86_64-linux-gnu/libcuda.so.1 /usr/lib/x86_64-linux-gnu/libc
 # Optional: make CUDA path explicit for Triton
 ENV TRITON_CUDA_HOME=/usr/local/cuda
 
-RUN python3 -m pip install --upgrade pip
 
 # Torch cu128
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
