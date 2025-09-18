@@ -110,7 +110,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
   'vllm serve "$HF_DOTS_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.95 \' \
   '  --chat-template-content-format string \' \
   '  --served-model-name rednote-hilab/dots.ocr \' \
-  '  --trust-remote-code --enforce-eager --port "$PORT_OCR" &' \
+  '  --trust-remote-code --enforce-eager --kv-cache-dtype auto --port "$PORT_OCR" &' \
   '' \
   'echo "Starting Qwen3-4B-FP8 on :$PORT_QWEN (GPU $GPU)..."' \
   'vllm serve "$HF_QWEN3_PATH" --tensor-parallel-size 1 --gpu-memory-utilization 0.25 \' \
