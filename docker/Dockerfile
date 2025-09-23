@@ -51,8 +51,8 @@ RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==${TORCH_VERSION}
 
 # Build a FlashAttention wheel in the supported range for vLLM 0.9.1
-# (2.7.1–2.7.4). Use 2.7.4 here.
-RUN pip3 wheel --no-deps --no-build-isolation "flash-attn==2.7.4" -w /flashwheels
+# (2.7.1–2.7.4). Use 2.7.3 here.
+RUN pip3 wheel --no-deps --no-build-isolation "flash-attn==2.7.3" -w /flashwheels
 
 
 # -------- Stage 3: runtime (Torch + vLLM + DotsOCR + weights)
