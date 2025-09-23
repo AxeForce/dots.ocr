@@ -40,7 +40,7 @@ FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS runtime
 
 # Install Python + system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip git build-essential ninja && \
+    python3 python3-pip git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Symlink python -> python3
@@ -57,8 +57,7 @@ RUN pip install --no-cache-dir \
     "accelerate>=0.34.0" \
     sentencepiece \
     "protobuf<5" \
-    flashinfer-python \
-    ninja
+    flashinfer-python
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
