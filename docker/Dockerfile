@@ -56,7 +56,11 @@ RUN pip install --no-cache-dir \
 
 # FlashInfer PREBUILT wheel for cu126 + torch2.6
 # Use --find-links to point to the folder that contains the wheel files.
-RUN pip install --no-cache-dir \
+# FlashInfer PREBUILT wheels for cu126 + torch2.6  (no PyPI fallback)
+RUN pip install --no-cache-dir --no-index --only-binary=:all: \
+    --find-links https://flashinfer.ai/whl/cu126/torch2.6/ \
+    flashinfer \
+ || pip install --no-cache-dir --no-index --only-binary=:all: \
     --find-links https://flashinfer.ai/whl/cu126/torch2.6/ \
     flashinfer-python
 
