@@ -57,7 +57,8 @@ RUN pip install --no-cache-dir \
     "accelerate>=0.34.0" \
     sentencepiece \
     "protobuf<5" \
-    flashinfer-python
+    flashinfer-python \
+    ninja
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
