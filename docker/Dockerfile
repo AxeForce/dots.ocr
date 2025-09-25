@@ -48,7 +48,7 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu12
 # vLLM + runtime deps (pin transformers to 4.51.3)
 RUN pip install --no-cache-dir \
       vllm==0.9.1 \
-      transformers==4.51.3 \
+      transformers==4.53.3 \
       "accelerate>=0.34.0" \
       sentencepiece \
       "protobuf<5"
