@@ -66,7 +66,7 @@ RUN pip install --no-cache-dir -v \
    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1"
 
 # sanity check: ensure the module is importable for vLLM
-RUN python - <<'PY'\nimport flashinfer, sys; print('flashinfer import OK:', getattr(flashinfer,'__version__','?'))\nPY
+RUN python -c "import flashinfer, sys; print('flashinfer import OK:', getattr(flashinfer,'__version__','?'))"
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
