@@ -33,11 +33,11 @@ shutil.copytree(repo, dest)
 PY
 
 # CUDA 12.6 runtime to match cu126 wheels
-FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS runtime
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip git ca-certificates build-essential libc6-dev ninja-build \
-    rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
@@ -45,7 +45,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel packaging build
 
 # Torch cu128
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
       torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 
 # vLLM + runtime deps (pin transformers to 4.51.3)
@@ -62,6 +62,8 @@ RUN pip install --no-cache-dir -v \
 
 # sanity check: ensure the module is importable for vLLM
 RUN python -c "import flashinfer, sys; print('flashinfer import OK:', getattr(flashinfer,'__version__','?'))"
+
+RUN rm -rf /root/.cache/huggingface/modules
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
