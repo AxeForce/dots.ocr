@@ -52,26 +52,15 @@ RUN pip install --no-cache-dir --no-deps sentencepiece==0.2.0 "protobuf<5"
 # then allow deps in a small pass (won’t touch torch now that it’s pinned & satisfied)
 RUN pip install --no-cache-dir "fastapi>=0.111,<1" "uvicorn>=0.29" "httpx>=0.26"
 
-# ---------- FlashInfer: download the exact prebuilt wheel ----------
-# We avoid directory listing/index issues by fetching the file directly.
-# Python is 3.10 -> cp310; manylinux2014 is the common tag for x86_64 wheels.
-ARG FI_VER=0.3.1
-ARG PYTAG=cp310
-ARG WHEEL_BASE=https://flashinfer.ai/whl/cu126/torch2.6
+# toolchain to compile JIT/AOT bits
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git build-essential libc6-dev ninja-build && \
+    rm -rf /var/lib/apt/lists/*
 
-# Try both historical names (flashinfer / flashinfer_python), stop at first success.
-RUN set -eux; \
-  for pkg in flashinfer flashinfer_python; do \
-    for tag in manylinux2014_x86_64 manylinux_2_17_x86_64.manylinux2014_x86_64; do \
-      fname="${pkg}-${FI_VER}+cu126torch2.6-${PYTAG}-${PYTAG}-${tag}.whl"; \
-      echo "Trying $WHEEL_BASE/$fname"; \
-      if curl -fSL "$WHEEL_BASE/$fname" -o "/tmp/$fname"; then \
-        pip install --no-cache-dir "/tmp/$fname"; \
-        rm "/tmp/$fname"; \
-        break 2; \
-      fi; \
-    done; \
-  done
+# (assuming you already installed torch==2.7.0 from the cu128 index)
+# Install FlashInfer v0.3.1 directly from GitHub (python subdir), no isolation
+RUN pip install --no-cache-dir --no-build-isolation -v \
+    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1#subdirectory=python"
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
