@@ -54,7 +54,7 @@ RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/wh
 # (Transformers 4.52.0 works with the latest dots.ocr dynamic modules)
 RUN pip install --no-cache-dir \
     "vllm==0.10.0" \
-    "transformers==4.52.0" \
+    "transformers>=4.53.2" \
     "accelerate>=1.0.0" \
     "sentencepiece>=0.2.0" \
     "protobuf<5"
