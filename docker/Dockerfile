@@ -35,7 +35,7 @@ PY
 # ------------------------------------------------------
 # Stage 2: runtime image with CUDA + Torch 2.7 + vLLM 0.10 + FlashInfer
 # ------------------------------------------------------
-FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS runtime
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS runtime
 
 # Base system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
