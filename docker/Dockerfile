@@ -32,33 +32,36 @@ if os.path.isdir(dest):
 shutil.copytree(repo, dest)
 PY
 
-
 # ------------------------------------------------------
 # Stage 2: final runtime image with CUDA + vLLM + FlashInfer
 # ------------------------------------------------------
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS runtime
 
-# Install Python + system deps
+# System deps (add ninja-build for native extensions that expect it)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip git ca-certificates && \
+    python3 python3-pip git ca-certificates ninja-build && \
     rm -rf /var/lib/apt/lists/*
 
 # Symlink python -> python3
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# Torch with CUDA 12.8 (matches base image)
-RUN pip install --extra-index-url https://download.pytorch.org/whl/cu128 \
+# Torch with CUDA 12.8 (cu128)
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==2.7.0
 
-# Install vLLM + Transformers + Accelerate + FlashInfer
+# vLLM + friends
 RUN pip install --no-cache-dir \
     vllm==0.9.1 \
-    "transformers==4.51.3" \
+    transformers==4.51.3 \
     "accelerate>=0.34.0" \
     sentencepiece \
-    "protobuf<5" \
-    flashinfer-python \
-    ninja
+    "protobuf<5"
+
+# FlashInfer: use the official wheel index for CUDA 12.x (cu12x)
+# (Do NOT install 'flashinfer-python')
+RUN pip install --no-cache-dir \
+    --extra-index-url https://wheels.flashinfer.ai/cu12x \
+    flashinfer==0.3.1
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
