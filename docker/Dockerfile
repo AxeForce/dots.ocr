@@ -42,9 +42,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# Install PyTorch 2.7.0 built for cu126
+# Torch 2.6.* (cu126)
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
-    torch==2.7.0
+    "torch==2.6.0" "torchaudio==2.6.0" "torchvision==0.21.0"
 
 # vLLM + common deps (pin as you need)
 RUN pip install --no-cache-dir \
@@ -54,11 +54,12 @@ RUN pip install --no-cache-dir \
     sentencepiece \
     "protobuf<5"
 
-# FlashInfer prebuilt wheel for cu126 + torch2.7
-# (FlashInfer hosts wheels under cu118/cu121/cu124/cu126)
+# FlashInfer PREBUILT wheel for cu126 + torch2.6
+# Use --find-links to point to the folder that contains the wheel files.
 RUN pip install --no-cache-dir \
-    -i https://flashinfer.ai/whl/cu126/torch2.7/ \
+    --find-links https://flashinfer.ai/whl/cu126/torch2.6/ \
     flashinfer-python
+
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
 COPY --from=builder /models/DotsOCR /models/DotsOCR
