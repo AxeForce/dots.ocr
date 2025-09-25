@@ -36,7 +36,7 @@ PY
 FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip git ca-certificates build-essential ninja-build \
+    python3 python3-pip git ca-certificates build-essential libc6-dev ninja-build \
     rm -rf /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
@@ -55,11 +55,6 @@ RUN pip install --no-cache-dir \
       "accelerate>=0.34.0" \
       sentencepiece \
       "protobuf<5"
-
-# toolchain to compile JIT/AOT bits
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git build-essential libc6-dev ninja-build && \
-    rm -rf /var/lib/apt/lists/*
 
 # FlashInfer 0.3.1 from GitHub (build isolation ON so modern backend is used)
 RUN pip install --no-cache-dir -v \
