@@ -6,29 +6,43 @@ FROM python:3.10-slim AS builder
 # System deps for git-lfs handled by HF hub; we only need python deps
 RUN pip install --no-cache-dir "huggingface_hub>=0.24.6"
 
-# Download full snapshot (all modeling files + weights) into /models/DotsOCR
-# Using a folder name WITHOUT periods avoids transformers dynamic-module path issues.
+# Pull full model snapshot into /models/DotsOCR (no periods in the folder name)
 RUN python - <<'PY'
 from huggingface_hub import snapshot_download
-import os, shutil
+import os, shutil, json, pathlib
 
 repo_id = "rednote-hilab/dots.ocr"
-target = "/models/DotsOCR"
+target  = "/models/DotsOCR"
 
-# Pull everything (model weights + *.py including modeling_dots_ocr_vllm.py)
-cache_dir = snapshot_download(
-    repo_id,
-    repo_type="model",
-    local_files_only=False,
-    ignore_patterns=[],
-    allow_patterns=None,
-)
+snap = snapshot_download(repo_id, repo_type="model")
 
-# Copy to a clean target dir
 if os.path.isdir(target):
     shutil.rmtree(target)
-shutil.copytree(cache_dir, target, dirs_exist_ok=False)
-print("Copied HF snapshot to", target)
+shutil.copytree(snap, target, dirs_exist_ok=True)
+
+# Ensure it's a Python package (helps some loaders)
+pathlib.Path(target, "__init__.py").write_text("# package marker\n")
+
+# Patch config.json to include auto_map so AutoModel* can resolve custom classes
+cfg_path = os.path.join(target, "config.json")
+with open(cfg_path, "r") as f:
+    cfg = json.load(f)
+
+cfg.setdefault("architectures", ["DotsOCRForCausalLM"])
+cfg.setdefault("model_type", "dots")  # harmless if already present
+
+auto_map = cfg.get("auto_map", {})
+# Only fill if missing; do not overwrite if user already has entries
+auto_map.setdefault("AutoConfig", "configuration_dots.DotsConfig")
+# vLLM asks for a CausalLM-capable arch; provide both generic and CausalLM
+auto_map.setdefault("AutoModel", "modeling_dots_ocr.DotsOCRForCausalLM")
+auto_map.setdefault("AutoModelForCausalLM", "modeling_dots_ocr.DotsOCRForCausalLM")
+
+cfg["auto_map"] = auto_map
+
+with open(cfg_path, "w") as f:
+    json.dump(cfg, f, indent=2)
+print("Patched auto_map in", cfg_path)
 PY
 
 
