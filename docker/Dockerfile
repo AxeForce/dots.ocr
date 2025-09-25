@@ -41,16 +41,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# ---------- Pin Torch 2.6 (cu126) and matching vision/audio ----------
+# Torch cu128
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
-    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0
+      torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 
-# VERY IMPORTANT: install libs that often try to upgrade torch, but block deps
-RUN pip install --no-cache-dir --no-deps vllm==0.9.1
-RUN pip install --no-cache-dir --no-deps transformers==4.51.3 accelerate==0.34.2
-RUN pip install --no-cache-dir --no-deps sentencepiece==0.2.0 "protobuf<5"
-# then allow deps in a small pass (won’t touch torch now that it’s pinned & satisfied)
-RUN pip install --no-cache-dir "fastapi>=0.111,<1" "uvicorn>=0.29" "httpx>=0.26"
+# vLLM + runtime deps (pin transformers to 4.51.3)
+RUN pip install --no-cache-dir \
+      vllm==0.9.1 \
+      transformers==4.51.3 \
+      "accelerate>=0.34.0" \
+      sentencepiece \
+      "protobuf<5"
 
 # toolchain to compile JIT/AOT bits
 RUN apt-get update && apt-get install -y --no-install-recommends \
