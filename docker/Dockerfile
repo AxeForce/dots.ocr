@@ -1,80 +1,95 @@
 # ------------------------------------------------------
-# Stage 1: fetch source + weights + build dots-ocr wheel
+# Stage 1: fetch weights + code from Hugging Face
 # ------------------------------------------------------
 FROM python:3.10-slim AS builder
 
-# System deps for git + LFS
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git git-lfs && \
-    git lfs install && rm -rf /var/lib/apt/lists/*
+# System deps for git-lfs handled by HF hub; we only need python deps
+RUN pip install --no-cache-dir "huggingface_hub>=0.24.6"
 
-# Python build deps
-RUN pip install --no-cache-dir "huggingface_hub>=0.24.6" \
-    build setuptools wheel setuptools-scm hatchling
-
-# Get dots.ocr repo
-ARG DOTSOCR_REF=master
-RUN git clone --depth 1 --branch "${DOTSOCR_REF}" https://github.com/rednote-hilab/dots.ocr.git /src/dots.ocr
-
-# Download model weights into /models/DotsOCR
+# Download full snapshot (all modeling files + weights) into /models/DotsOCR
+# Using a folder name WITHOUT periods avoids transformers dynamic-module path issues.
 RUN python - <<'PY'
-import os, shutil
 from huggingface_hub import snapshot_download
-repo = snapshot_download(
-    "rednote-hilab/dots.ocr",
-    resume_download=True,
-    allow_patterns=["*.safetensors","*.bin","*.json","*.py",
-                    "tokenizer*","*.model","*.txt","merges.txt","vocab.json"]
+import os, shutil
+
+repo_id = "rednote-hilab/dots.ocr"
+target = "/models/DotsOCR"
+
+# Pull everything (model weights + *.py including modeling_dots_ocr_vllm.py)
+cache_dir = snapshot_download(
+    repo_id,
+    repo_type="model",
+    local_files_only=False,
+    ignore_patterns=[],
+    allow_patterns=None,
 )
-dest = "/models/DotsOCR"
-if os.path.isdir(dest):
-    shutil.rmtree(dest)
-shutil.copytree(repo, dest)
+
+# Copy to a clean target dir
+if os.path.isdir(target):
+    shutil.rmtree(target)
+shutil.copytree(cache_dir, target, dirs_exist_ok=False)
+print("Copied HF snapshot to", target)
 PY
 
-# CUDA 12.6 runtime to match cu126 wheels
-FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS runtime
 
+# ------------------------------------------------------
+# Stage 2: runtime image with CUDA + Torch 2.7 + vLLM 0.10 + FlashInfer
+# ------------------------------------------------------
+FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS runtime
+
+# Base system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip git ca-certificates build-essential libc6-dev ninja-build \
+    python3 python3-pip python3-venv ca-certificates \
+    git build-essential ninja-build curl \
  && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/python3 /usr/bin/python
+# Make "python" available
+RUN ln -sf /usr/bin/python3 /usr/bin/python && python --version && pip --version
 
-## CRITICAL: upgrade pip & build backends so project metadata is read correctly
-RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel packaging build
+# Torch 2.7.0 (CUDA 12.8)
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
 
-# Torch cu128
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu128 \
-      torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0
-
-# vLLM + runtime deps (pin transformers to 4.51.3)
+# Core libs: vLLM 0.10 + Transformers + friends
+# (Transformers 4.52.0 works with the latest dots.ocr dynamic modules)
 RUN pip install --no-cache-dir \
-      vllm==0.9.1 \
-      transformers==4.51.3 \
-      "accelerate>=0.34.0" \
-      sentencepiece \
-      "protobuf<5"
+    "vllm==0.10.0" \
+    "transformers==4.52.0" \
+    "accelerate>=1.0.0" \
+    "sentencepiece>=0.2.0" \
+    "protobuf<5"
 
-# FlashInfer 0.3.1 from GitHub (build isolation ON so modern backend is used)
-RUN pip install --no-cache-dir -v \
-   "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1"
+# FlashInfer: build from PyPI sdist (provides the 'flashinfer' python module)
+# This path has proven to work reliably on runtime images.
+# Try 0.3.1 first, fall back to 0.3.0 if needed.
+RUN pip install --no-cache-dir "flashinfer_python==0.3.1" \
+ || pip install --no-cache-dir "flashinfer_python==0.3.0"
 
-# sanity check: ensure the module is importable for vLLM
-RUN python -c "import flashinfer, sys; print('flashinfer import OK:', getattr(flashinfer,'__version__','?'))"
+# (Optional) quick sanity check
+RUN python - <<'PY'
+import importlib, sys
+m = importlib.import_module("flashinfer")
+print("flashinfer import OK; module:", m.__name__, "version:", getattr(m, "__version__", "unknown"))
+PY
 
-RUN rm -rf /root/.cache/huggingface/modules
-
-# Copy dots.ocr source + weights
-COPY --from=builder /src/dots.ocr /app/dots.ocr
+# Copy the model snapshot (no dots in path)
 COPY --from=builder /models/DotsOCR /models/DotsOCR
+
+# Helpful caches/paths (optional)
+ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
+ENV HF_HOME=/root/.cache/huggingface
+# Use FlashInfer as the attention backend for vLLM
+ENV VLLM_ATTENTION_BACKEND=FLASHINFER
 
 WORKDIR /app
 
-# Set FlashInfer as backend
-ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+# Expose the default vLLM port
+EXPOSE 8000
 
-# Fix the CMD quoting and args
+# Run vLLM against the LOCAL folder (/models/DotsOCR)
+# Notes:
+# - We set --trust-remote-code so vLLM can import the custom modeling files we downloaded.
+# - We keep the directory name free of '.' to avoid dynamic module import issues.
 CMD ["bash","-lc","vllm serve /models/DotsOCR \
   --host 0.0.0.0 --port 8000 \
   --trust-remote-code --max-model-len 8192 \
