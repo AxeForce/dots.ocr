@@ -57,10 +57,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git build-essential libc6-dev ninja-build && \
     rm -rf /var/lib/apt/lists/*
 
-# (assuming you already installed torch==2.7.0 from the cu128 index)
-# Install FlashInfer v0.3.1 directly from GitHub (python subdir), no isolation
+# FlashInfer 0.3.1 from GitHub — install from repo ROOT (no subdirectory)
 RUN pip install --no-cache-dir --no-build-isolation -v \
-    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1#subdirectory=python"
+    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1"
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
