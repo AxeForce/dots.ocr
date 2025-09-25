@@ -9,40 +9,58 @@ RUN pip install --no-cache-dir "huggingface_hub>=0.24.6"
 # Pull full model snapshot into /models/DotsOCR (no periods in the folder name)
 RUN python - <<'PY'
 from huggingface_hub import snapshot_download
-import os, shutil, json, pathlib
+import json
+import shutil
+from pathlib import Path
 
 repo_id = "rednote-hilab/dots.ocr"
-target  = "/models/DotsOCR"
+target = Path("/models/DotsOCR")
+package_root = Path("/opt/dots_ocr_hf")
 
-snap = snapshot_download(repo_id, repo_type="model")
+snap = Path(snapshot_download(repo_id, repo_type="model"))
 
-if os.path.isdir(target):
+if target.exists():
     shutil.rmtree(target)
 shutil.copytree(snap, target, dirs_exist_ok=True)
 
 # Ensure it's a Python package (helps some loaders)
-pathlib.Path(target, "__init__.py").write_text("# package marker\n")
+(target / "__init__.py").write_text("# package marker\n", encoding="utf-8")
 
-# Patch config.json to include auto_map so AutoModel* can resolve custom classes
-cfg_path = os.path.join(target, "config.json")
-with open(cfg_path, "r") as f:
-    cfg = json.load(f)
+# Mirror core modeling code locally for vLLM (no remote imports required)
+if package_root.exists():
+    shutil.rmtree(package_root)
+package_root.mkdir(parents=True, exist_ok=True)
+
+for filename in [
+    "configuration_dots.py",
+    "modeling_dots_ocr.py",
+    "modeling_dots_vision.py",
+]:
+    matches = list(target.rglob(filename))
+    if not matches:
+        raise FileNotFoundError(f"Could not find {filename} in {target}")
+    shutil.copy(matches[0], package_root / filename)
+
+(package_root / "__init__.py").write_text(
+    "from .configuration_dots import DotsOCRConfig\n"
+    "from .modeling_dots_ocr import DotsOCRForCausalLM\n",
+    encoding="utf-8",
+)
+
+# Patch config.json to point auto_map at the local package
+cfg_path = target / "config.json"
+cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
 
 cfg.setdefault("architectures", ["DotsOCRForCausalLM"])
 cfg.setdefault("model_type", "dots")  # harmless if already present
 
-auto_map = cfg.get("auto_map", {})
-# Only fill if missing; do not overwrite if user already has entries
-auto_map.setdefault("AutoConfig", "configuration_dots.DotsConfig")
-# vLLM asks for a CausalLM-capable arch; provide both generic and CausalLM
-auto_map.setdefault("AutoModel", "modeling_dots_ocr.DotsOCRForCausalLM")
-auto_map.setdefault("AutoModelForCausalLM", "modeling_dots_ocr.DotsOCRForCausalLM")
+cfg["auto_map"] = {
+    "AutoConfig": "dots_ocr_hf.configuration_dots.DotsOCRConfig",
+    "AutoModelForCausalLM": "dots_ocr_hf.modeling_dots_ocr.DotsOCRForCausalLM",
+}
 
-cfg["auto_map"] = auto_map
-
-with open(cfg_path, "w") as f:
-    json.dump(cfg, f, indent=2)
-print("Patched auto_map in", cfg_path)
+cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+print("Prepared local dots_ocr_hf package and patched", cfg_path)
 PY
 
 
@@ -87,7 +105,8 @@ m = importlib.import_module("flashinfer")
 print("flashinfer import OK; module:", m.__name__, "version:", getattr(m, "__version__", "unknown"))
 PY
 
-# Copy the model snapshot (no dots in path)
+# Copy the model snapshot (no dots in path) and local modeling package
+COPY --from=builder /opt/dots_ocr_hf /app/dots_ocr_hf
 COPY --from=builder /models/DotsOCR /models/DotsOCR
 
 # Helpful caches/paths (optional)
