@@ -94,7 +94,6 @@ EXPOSE 8000
 CMD ["bash","-lc","vllm serve /models/DotsOCR \
   --host 0.0.0.0 --port 8000 \
   --trust-remote-code --max-model-len 8192 \
-  --served-model-name rednote-hilab/dots.ocr \
   --gpu-memory-utilization 0.95 \
   --kv-cache-dtype fp8 \
   --max-num-batched-tokens 32768 \
