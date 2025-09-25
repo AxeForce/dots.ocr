@@ -32,24 +32,21 @@ if os.path.isdir(dest):
 shutil.copytree(repo, dest)
 PY
 
-# ------------------------------------------------------
-# Stage 2: final runtime image with CUDA + vLLM + FlashInfer
-# ------------------------------------------------------
-FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS runtime
+# -------- Stage 2: final runtime image WITH prebuilt FlashInfer wheels
+# Use a CUDA 12.6 runtime (FlashInfer hosts cu126 wheels)
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS runtime
 
-# System deps (add ninja-build for native extensions that expect it)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip git ca-certificates ninja-build && \
     rm -rf /var/lib/apt/lists/*
 
-# Symlink python -> python3
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# Torch with CUDA 12.8 (cu128)
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu128 \
+# Install PyTorch 2.7.0 built for cu126
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
     torch==2.7.0
 
-# vLLM + friends
+# vLLM + common deps (pin as you need)
 RUN pip install --no-cache-dir \
     vllm==0.9.1 \
     transformers==4.51.3 \
@@ -57,15 +54,11 @@ RUN pip install --no-cache-dir \
     sentencepiece \
     "protobuf<5"
 
-# FlashInfer prebuilt wheels for CUDA 12.x
-# Use --find-links (not --extra-index-url) and the correct host/path.
+# FlashInfer prebuilt wheel for cu126 + torch2.7
+# (FlashInfer hosts wheels under cu118/cu121/cu124/cu126)
 RUN pip install --no-cache-dir \
-    --find-links https://flashinfer.ai/whl/cu12x/ \
-    flashinfer==0.3.1 \
- || pip install --no-cache-dir \
-    --find-links https://flashinfer.ai/whl/cu12x/ \
-    flashinfer==0.3.0
-
+    -i https://flashinfer.ai/whl/cu126/torch2.7/ \
+    flashinfer-python
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
 COPY --from=builder /models/DotsOCR /models/DotsOCR
@@ -75,12 +68,12 @@ WORKDIR /app
 # Set FlashInfer as backend
 ENV VLLM_ATTENTION_BACKEND=FLASHINFER
 
-# Default vLLM server command (override in Koyeb dashboard if needed)
-CMD ["bash,"lc", "vllm", "serve", "/models/DotsOCR", \
-     "--host", "0.0.0.0", "--port", "8000", \
-     "--trust-remote-code", "--max-model-len", "8192", \
-     "--served-model-name", "rednote-hilab/dots.ocr", \
-     "--gpu-memory-utilization", "0.95", \
-     "--kv-cache-dtype", "fp8", \
-     "--max-num-batched-tokens", "32768", \
-     "--max-num-seqs", "512"]
+# Fix the CMD quoting and args
+CMD ["bash","-lc","vllm serve /models/DotsOCR \
+  --host 0.0.0.0 --port 8000 \
+  --trust-remote-code --max-model-len 8192 \
+  --served-model-name rednote-hilab/dots.ocr \
+  --gpu-memory-utilization 0.95 \
+  --kv-cache-dtype fp8 \
+  --max-num-batched-tokens 32768 \
+  --max-num-seqs 512"]
