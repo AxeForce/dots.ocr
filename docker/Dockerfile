@@ -16,6 +16,7 @@ from pathlib import Path
 repo_id = "rednote-hilab/dots.ocr"
 target = Path("/models/DotsOCR")
 package_root = Path("/opt/dots_ocr_hf")
+target_package = target / "dots_ocr_hf"
 
 snap = Path(snapshot_download(repo_id, repo_type="model"))
 
@@ -31,6 +32,10 @@ if package_root.exists():
     shutil.rmtree(package_root)
 package_root.mkdir(parents=True, exist_ok=True)
 
+if target_package.exists():
+    shutil.rmtree(target_package)
+target_package.mkdir(parents=True, exist_ok=True)
+
 for filename in [
     "configuration_dots.py",
     "modeling_dots_ocr.py",
@@ -40,8 +45,15 @@ for filename in [
     if not matches:
         raise FileNotFoundError(f"Could not find {filename} in {target}")
     shutil.copy(matches[0], package_root / filename)
+    shutil.copy(matches[0], target_package / filename)
 
 (package_root / "__init__.py").write_text(
+    "from .configuration_dots import DotsOCRConfig\n"
+    "from .modeling_dots_ocr import DotsOCRForCausalLM\n",
+    encoding="utf-8",
+)
+
+(target_package / "__init__.py").write_text(
     "from .configuration_dots import DotsOCRConfig\n"
     "from .modeling_dots_ocr import DotsOCRForCausalLM\n",
     encoding="utf-8",
