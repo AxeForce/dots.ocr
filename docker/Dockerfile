@@ -54,16 +54,17 @@ RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/wh
 # (Transformers 4.52.0 works with the latest dots.ocr dynamic modules)
 RUN pip install --no-cache-dir \
     "vllm==0.10.0" \
-    "transformers>=4.53.2" \
+    "transformers==4.56.2" \
     "accelerate>=1.0.0" \
     "sentencepiece>=0.2.0" \
     "protobuf<5"
 
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel packaging build
+
 # FlashInfer: build from PyPI sdist (provides the 'flashinfer' python module)
 # This path has proven to work reliably on runtime images.
-# Try 0.3.1 first, fall back to 0.3.0 if needed.
-RUN pip install --no-cache-dir "flashinfer_python==0.3.1" \
- || pip install --no-cache-dir "flashinfer_python==0.3.0"
+RUN pip install --no-cache-dir -v \
+    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1"
 
 # (Optional) quick sanity check
 RUN python - <<'PY'
