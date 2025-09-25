@@ -57,11 +57,14 @@ RUN pip install --no-cache-dir \
     sentencepiece \
     "protobuf<5"
 
-# FlashInfer: use the official wheel index for CUDA 12.x (cu12x)
-# (Do NOT install 'flashinfer-python')
+# FlashInfer prebuilt wheels for CUDA 12.x
+# Use --find-links (not --extra-index-url) and the correct host/path.
 RUN pip install --no-cache-dir \
-    --extra-index-url https://wheels.flashinfer.ai/cu12x \
-    flashinfer==0.3.1
+    --find-links https://flashinfer.ai/whl/cu12x/ \
+    flashinfer==0.3.1 \
+ || pip install --no-cache-dir \
+    --find-links https://flashinfer.ai/whl/cu12x/ \
+    flashinfer==0.3.0
 
 # Copy dots.ocr source + weights
 COPY --from=builder /src/dots.ocr /app/dots.ocr
