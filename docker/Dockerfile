@@ -86,7 +86,7 @@ PY
 
 
 # ------------------------------------------------------
-# Stage 2: runtime image with CUDA + Torch 2.7 + vLLM 0.10 + FlashInfer
+# Stage 2: runtime image with CUDA + Torch 2.7 + vLLM 0.10 + FlashAttention 2
 # ------------------------------------------------------
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS runtime
 
@@ -114,16 +114,14 @@ RUN pip install --no-cache-dir \
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel packaging build
 
-# FlashInfer: build from PyPI sdist (provides the 'flashinfer' python module)
-# This path has proven to work reliably on runtime images.
-RUN pip install --no-cache-dir -v \
-    "git+https://github.com/flashinfer-ai/flashinfer.git@v0.3.1"
+# FlashAttention 2: install from PyPI
+RUN pip install --no-cache-dir "flash-attn==2.8.0.post2"
 
 # (Optional) quick sanity check
 RUN python - <<'PY'
 import importlib, sys
-m = importlib.import_module("flashinfer")
-print("flashinfer import OK; module:", m.__name__, "version:", getattr(m, "__version__", "unknown"))
+m = importlib.import_module("flash_attn")
+print("flash_attn import OK; module:", m.__name__, "version:", getattr(m, "__version__", "unknown"))
 PY
 
 # Copy the model snapshot (no dots in path) and local modeling package
@@ -133,8 +131,8 @@ COPY --from=builder /models/DotsOCR /models/DotsOCR
 # Helpful caches/paths (optional)
 ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
 ENV HF_HOME=/root/.cache/huggingface
-# Use FlashInfer as the attention backend for vLLM
-ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+# Use FlashAttention 2 as the attention backend for vLLM
+ENV VLLM_ATTENTION_BACKEND=FLASH_ATTN_2
 ENV PYTHONPATH=/app:/models/DotsOCR:${PYTHONPATH}
 
 WORKDIR /app
@@ -150,6 +148,6 @@ CMD ["bash","-lc","vllm serve /models/DotsOCR \
   --host 0.0.0.0 --port 8000 \
   --trust-remote-code --max-model-len 8192 \
   --gpu-memory-utilization 0.95 \
-  --kv-cache-dtype fp8 \
+  --dtype bfloat16 \
   --max-num-batched-tokens 32768 \
   --max-num-seqs 512"]
