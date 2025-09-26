@@ -19,7 +19,7 @@ package_root = Path("/opt/dots_ocr_hf")
 target_package = target / "dots_ocr_hf"
 aggregator_defs = {
     "dots_ocr_hf_configuration_dots.py": "from dots_ocr_hf.configuration_dots import DotsOCRConfig\n",
-    "dots_ocr_hf_modeling_dots_ocr.py": "from dots_ocr_hf.modeling_dots_ocr import DotsOCRForCausalLM\n",
+    "dots_ocr_hf_modeling_dots_ocr.py": "from dots_ocr_hf.modeling_dots_ocr_vllm import DotsOCRForCausalLM\n",
 }
 
 snap = Path(snapshot_download(repo_id, repo_type="model"))
@@ -43,6 +43,7 @@ target_package.mkdir(parents=True, exist_ok=True)
 for filename in [
     "configuration_dots.py",
     "modeling_dots_ocr.py",
+    "modeling_dots_ocr_vllm.py",
     "modeling_dots_vision.py",
 ]:
     matches = list(target.rglob(filename))
@@ -53,13 +54,13 @@ for filename in [
 
 (package_root / "__init__.py").write_text(
     "from .configuration_dots import DotsOCRConfig\n"
-    "from .modeling_dots_ocr import DotsOCRForCausalLM\n",
+    "from .modeling_dots_ocr_vllm import DotsOCRForCausalLM\n",
     encoding="utf-8",
 )
 
 (target_package / "__init__.py").write_text(
     "from .configuration_dots import DotsOCRConfig\n"
-    "from .modeling_dots_ocr import DotsOCRForCausalLM\n",
+    "from .modeling_dots_ocr_vllm import DotsOCRForCausalLM\n",
     encoding="utf-8",
 )
 
