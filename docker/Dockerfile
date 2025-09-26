@@ -131,8 +131,6 @@ COPY --from=builder /models/DotsOCR /models/DotsOCR
 # Helpful caches/paths (optional)
 ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
 ENV HF_HOME=/root/.cache/huggingface
-# Use FlashAttention 2 as the attention backend for vLLM
-ENV VLLM_ATTENTION_BACKEND=FLASH_ATTN_2
 ENV PYTHONPATH=/app:/models/DotsOCR:${PYTHONPATH}
 
 WORKDIR /app
@@ -147,7 +145,9 @@ EXPOSE 8000
 CMD ["bash","-lc","vllm serve /models/DotsOCR \
   --host 0.0.0.0 --port 8000 \
   --trust-remote-code --max-model-len 8192 \
+  --served-model-name rednote-hilab/dots.ocr \
+  --chat-template-content-format string \
   --gpu-memory-utilization 0.95 \
   --dtype bfloat16 \
   --max-num-batched-tokens 24668 \
-  --max-num-seqs 512"]
+  --max-num-seqs 128"]
