@@ -67,9 +67,9 @@ cfg.setdefault("architectures", ["DotsOCRForCausalLM"])
 cfg.setdefault("model_type", "dots")  # harmless if already present
 
 cfg["auto_map"] = {
-    "AutoConfig": "dots_ocr_hf.configuration_dots,DotsOCRConfig",
-    "AutoModel": "dots_ocr_hf.modeling_dots_ocr,DotsOCRForCausalLM",
-    "AutoModelForCausalLM": "dots_ocr_hf.modeling_dots_ocr,DotsOCRForCausalLM",
+    "AutoConfig": "dots_ocr_hf.configuration_dots.DotsOCRConfig",
+    "AutoModel": "dots_ocr_hf.modeling_dots_ocr.DotsOCRForCausalLM",
+    "AutoModelForCausalLM": "dots_ocr_hf.modeling_dots_ocr.DotsOCRForCausalLM",
 }
 
 cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
