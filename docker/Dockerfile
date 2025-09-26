@@ -92,7 +92,7 @@ FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS runtime
 
 # Base system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv ca-certificates \
+    python3 python3-pip python3-venv python3-dev ca-certificates \
     git build-essential ninja-build curl \
  && rm -rf /var/lib/apt/lists/*
 
