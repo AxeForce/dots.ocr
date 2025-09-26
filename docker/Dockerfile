@@ -149,5 +149,5 @@ CMD ["bash","-lc","vllm serve /models/DotsOCR \
   --trust-remote-code --max-model-len 8192 \
   --gpu-memory-utilization 0.95 \
   --dtype bfloat16 \
-  --max-num-batched-tokens 32768 \
+  --max-num-batched-tokens 24668 \
   --max-num-seqs 512"]
