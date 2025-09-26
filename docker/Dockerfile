@@ -17,6 +17,10 @@ repo_id = "rednote-hilab/dots.ocr"
 target = Path("/models/DotsOCR")
 package_root = Path("/opt/dots_ocr_hf")
 target_package = target / "dots_ocr_hf"
+aggregator_defs = {
+    "dots_ocr_hf_configuration_dots.py": "from dots_ocr_hf.configuration_dots import DotsOCRConfig\n",
+    "dots_ocr_hf_modeling_dots_ocr.py": "from dots_ocr_hf.modeling_dots_ocr import DotsOCRForCausalLM\n",
+}
 
 snap = Path(snapshot_download(repo_id, repo_type="model"))
 
@@ -59,6 +63,9 @@ for filename in [
     encoding="utf-8",
 )
 
+for fname, content in aggregator_defs.items():
+    (target / fname).write_text(content, encoding="utf-8")
+
 # Patch config.json to point auto_map at the local package
 cfg_path = target / "config.json"
 cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -67,18 +74,9 @@ cfg.setdefault("architectures", ["DotsOCRForCausalLM"])
 cfg.setdefault("model_type", "dots")  # harmless if already present
 
 cfg["auto_map"] = {
-    "AutoConfig": [
-        "dots_ocr_hf.configuration_dots",
-        "DotsOCRConfig",
-    ],
-    "AutoModel": [
-        "dots_ocr_hf.modeling_dots_ocr",
-        "DotsOCRForCausalLM",
-    ],
-    "AutoModelForCausalLM": [
-        "dots_ocr_hf.modeling_dots_ocr",
-        "DotsOCRForCausalLM",
-    ],
+    "AutoConfig": "dots_ocr_hf_configuration_dots.DotsOCRConfig",
+    "AutoModel": "dots_ocr_hf_modeling_dots_ocr.DotsOCRForCausalLM",
+    "AutoModelForCausalLM": "dots_ocr_hf_modeling_dots_ocr.DotsOCRForCausalLM",
 }
 
 cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
@@ -136,7 +134,7 @@ ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
 ENV HF_HOME=/root/.cache/huggingface
 # Use FlashInfer as the attention backend for vLLM
 ENV VLLM_ATTENTION_BACKEND=FLASHINFER
-ENV PYTHONPATH=/app:${PYTHONPATH}
+ENV PYTHONPATH=/app:/models/DotsOCR:${PYTHONPATH}
 
 WORKDIR /app
 
